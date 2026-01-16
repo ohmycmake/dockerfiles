@@ -1,5 +1,7 @@
 FROM ubuntu:noble
 
+ENV TERM=xterm-256color
+
 # Update package list and install necessary tools
 RUN apt-get update && \
     apt-get install -y \
@@ -55,12 +57,26 @@ RUN wget -O /tmp/kitware-archive.sh https://apt.kitware.com/kitware-archive.sh &
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Neovim from GitHub releases
-RUN curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz && \
-    rm -rf /opt/nvim-linux-x86_64 && \
-    tar -C /opt -xzf nvim-linux-x86_64.tar.gz && \
-    rm nvim-linux-x86_64.tar.gz && \
-    ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+# Install Neovim from GitHub releases (auto-detect architecture)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ]; then NVIM_ARCH="arm64"; else NVIM_ARCH="x86_64"; fi && \
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.tar.gz && \
+    rm -rf /opt/nvim-linux-${NVIM_ARCH} && \
+    tar -C /opt -xzf nvim-linux-${NVIM_ARCH}.tar.gz && \
+    rm nvim-linux-${NVIM_ARCH}.tar.gz && \
+    ln -sf /opt/nvim-linux-${NVIM_ARCH}/bin/nvim /usr/local/bin/nvim
+
+# Install Node.js (for nvim plugins like LSP, Mason, etc.)
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ripgrep and fd-find (for telescope and other nvim plugins)
+RUN apt-get update && \
+    apt-get install -y ripgrep fd-find && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create cmake user
 RUN useradd -m -s /bin/bash cmake && \
@@ -69,6 +85,15 @@ RUN useradd -m -s /bin/bash cmake && \
 # Switch to cmake user
 USER cmake
 WORKDIR /home/cmake
+
+# Clone dotfiles and setup nvim config
+RUN git clone https://github.com/ohmycmake/dotfiles.git /tmp/dotfiles && \
+    mkdir -p ~/.config && \
+    cp -r /tmp/dotfiles/nvim ~/.config/nvim && \
+    rm -rf /tmp/dotfiles
+
+# Pre-install nvim plugins (lazy.nvim will bootstrap on first run)
+RUN nvim --headless "+Lazy! sync" +qa || true
 
 # Default command
 CMD ["/bin/bash"]

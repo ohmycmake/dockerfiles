@@ -9,7 +9,7 @@ project(dockerfiles
 
 # Add custom target to build docker image
 add_custom_target(build-ohmycmake ALL
-    COMMAND docker build -f ohmycmake.dockerfile -t ohmycmake:latest .
+    COMMAND docker build -f ohmycmake.dockerfile -t ohmycmake/ohmycmake:latest .
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building ohmycmake docker image"
 )
